@@ -1,104 +1,91 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
 const VideoPlayer = ({ socket, roomId }) => {
   const videoRef = useRef(null);
-  const [videoFile, setVideoFile] = useState(null);
-  
-  // THE FLAG: This determines if a 'play' event came from you or the server
-  // true = "My partner clicked play, so I shouldn't send a signal back"
-  // false = "I clicked play, so I MUST send a signal"
-  const isRemoteUpdate = useRef(false); 
+  const [fileURL, setFileURL] = useState(null);
 
-  // 1. Handle loading the local file
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  // 1. HANDLE FILE UPLOAD
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
     if (file) {
-      setVideoFile(URL.createObjectURL(file));
+      const url = URL.createObjectURL(file);
+      setFileURL(url);
+      
+      // Notify partner that I have picked a file (Optional feature)
+      // socket.emit("file_change", { room: roomId, fileData: file.name });
     }
   };
 
-  // 2. Listen for signals from the Server (Partner)
   useEffect(() => {
-    if (!socket) return;
+    const video = videoRef.current;
+    if (!video) return;
 
-    socket.on('sync_action', (data) => {
-      console.log("Received action:", data);
-      
-      // Set flag to true so our local 'onPlay' handler knows to stay quiet
-      isRemoteUpdate.current = true;
+    // --- EMIT EVENTS (Send to Partner) ---
+    const handlePlay = () => {
+      socket.emit("play_video", { room: roomId });
+    };
 
-      const video = videoRef.current;
-      if (!video) return;
+    const handlePause = () => {
+      socket.emit("pause_video", { room: roomId });
+    };
 
-      if (data.type === 'PLAY') {
-        // Sync time first, then play
-        // We only adjust time if the difference is significant (> 0.5s) to avoid jumping
-        if (Math.abs(video.currentTime - data.time) > 0.5) {
-          video.currentTime = data.time;
-        }
-        video.play();
-      } else if (data.type === 'PAUSE') {
-        video.pause();
+    const handleSeek = () => {
+      socket.emit("seek_video", { room: roomId, timestamp: video.currentTime });
+    };
+
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+    video.addEventListener("seeking", handleSeek);
+
+    // --- LISTEN FOR EVENTS (Receive from Partner) ---
+    socket.on("receive_play", () => {
+      console.log("Partner Played");
+      video.play();
+    });
+
+    socket.on("receive_pause", () => {
+      console.log("Partner Paused");
+      video.pause();
+    });
+
+    socket.on("receive_seek", (timestamp) => {
+      console.log("Partner Seeked to:", timestamp);
+      // Small buffer check to prevent seek loops
+      if (Math.abs(video.currentTime - timestamp) > 0.5) {
+        video.currentTime = timestamp;
       }
-
-      // Reset the flag after a short delay
-      setTimeout(() => {
-        isRemoteUpdate.current = false;
-      }, 500);
     });
 
-    // Cleanup listener on unmount
-    return () => socket.off('sync_action');
-  }, [socket]);
-
-  // 3. Handle Local Events (Sending to Partner)
-  const handlePlay = () => {
-    if (isRemoteUpdate.current) return; // If this was triggered by code, STOP.
-
-    socket.emit('sync_action', {
-      roomId,
-      action: { type: 'PLAY', time: videoRef.current.currentTime }
-    });
-  };
-
-  const handlePause = () => {
-    if (isRemoteUpdate.current) return;
-
-    socket.emit('sync_action', {
-      roomId,
-      action: { type: 'PAUSE', time: videoRef.current.currentTime }
-    });
-  };
-
-  const handleSeek = () => {
-     if (isRemoteUpdate.current) return;
-     // When seeking, we treat it like a play event to sync the new timestamp
-     socket.emit('sync_action', {
-       roomId,
-       action: { type: 'PLAY', time: videoRef.current.currentTime }
-     });
-  };
+    return () => {
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+      video.removeEventListener("seeking", handleSeek);
+      
+      socket.off("receive_play");
+      socket.off("receive_pause");
+      socket.off("receive_seek");
+    };
+  }, [socket, roomId]);
 
   return (
-    <div style={{ textAlign: 'center', marginTop: '20px' }}>
-      {!videoFile && (
-        <div style={{ marginBottom: '20px' }}>
-          <h3>Step 2: Select your movie file</h3>
-          <p>(Your partner must select the same file)</p>
-          <input type="file" accept="video/*" onChange={handleFileChange} />
+    <div className="video-wrapper">
+      {!fileURL ? (
+        <div className="file-input-container">
+           <label className="custom-file-upload">
+              <input type="file" onChange={handleFileChange} accept="video/*" />
+              📂 Choose Movie File
+           </label>
+           <p style={{color:'white', marginTop:'10px', fontSize:'0.8rem'}}>
+             Both partners must select the same file from their own computer.
+           </p>
         </div>
-      )}
-
-      {videoFile && (
-        <video
-          ref={videoRef}
-          src={videoFile}
-          controls
-          width="80%"
-          style={{ border: '2px solid #333', borderRadius: '8px' }}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onSeeked={handleSeek}
+      ) : (
+        <video 
+          ref={videoRef} 
+          src={fileURL} 
+          controls 
+          className="main-video"
+          style={{ width: '100%' }}
         />
       )}
     </div>
