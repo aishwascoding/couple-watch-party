@@ -5,7 +5,7 @@ import VideoCall from './components/VideoCall';
 import ReactionBar from './components/ReactionBar';
 import './App.css';
 
-const socket = io.connect("http://localhost:3001");
+const socket = io.connect("https://benchmates-server.onrender.com");
 
 function App() {
   const [roomId, setRoomId] = useState("");
