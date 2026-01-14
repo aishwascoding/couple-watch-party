@@ -1,127 +1,193 @@
-import React, { useEffect, useRef, useState } from "react";
-import Peer from "simple-peer";
+import React, { useEffect, useState, useRef } from 'react';
+import Peer from 'simple-peer';
 
 const VideoCall = ({ socket, roomId }) => {
-	const [stream, setStream] = useState(null);
-	const [receivingCall, setReceivingCall] = useState(false);
-	const [caller, setCaller] = useState("");
-	const [callerSignal, setCallerSignal] = useState();
-	const [callAccepted, setCallAccepted] = useState(false);
-	const [callEnded, setCallEnded] = useState(false);
-	
-	const myVideo = useRef();
-	const userVideo = useRef();
-	const connectionRef = useRef();
+  const [stream, setStream] = useState(null);
+  const [partnerStream, setPartnerStream] = useState(null);
+  const [callAccepted, setCallAccepted] = useState(false);
+  const [receivingCall, setReceivingCall] = useState(false);
+  const [callerSignal, setCallerSignal] = useState(null);
+  const [caller, setCaller] = useState("");
+  const [idToCall, setIdToCall] = useState("");
+  
+  const myVideo = useRef();
+  const partnerVideo = useRef();
+  const connectionRef = useRef();
+  const connectionStatus = useRef("idle"); 
 
-	useEffect(() => {
-        // Get user media (Camera/Mic)
-		navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
-			setStream(stream);
-			if (myVideo.current) {
-				myVideo.current.srcObject = stream;
-			}
-		});
+  // --- DRAG LOGIC ---
+  const dragItem = useRef();
+  const isDragging = useRef(false);
+  const offset = useRef({ x: 0, y: 0 });
 
-        // Listen for incoming calls
-		socket.on("incoming_call", (data) => {
-			setReceivingCall(true);
-			setCaller(data.from);
-			setCallerSignal(data.signal);
-		});
-	}, [socket]);
+  const handleMouseDown = (e) => {
+    isDragging.current = true;
+    const rect = dragItem.current.getBoundingClientRect();
+    offset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
-	const callUser = () => {
-		const peer = new Peer({
-			initiator: true,
-			trickle: false,
-			stream: stream
-		});
+  const handleMouseMove = (e) => {
+    if (!isDragging.current || !dragItem.current) return;
+    e.preventDefault();
+    dragItem.current.style.left = `${e.clientX - offset.current.x}px`;
+    dragItem.current.style.top = `${e.clientY - offset.current.y}px`;
+  };
 
-		peer.on("signal", (data) => {
-			socket.emit("call_user", {
-				roomId: roomId, // Matches Server "data.roomId"
-				signalData: data,
-				from: socket.id
-			});
-		});
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
 
-		peer.on("stream", (stream) => {
-			if (userVideo.current) {
-				userVideo.current.srcObject = stream;
-			}
-		});
+  // --- VIDEO CONNECTION ---
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then((currentStream) => {
+        setStream(currentStream);
+        socket.emit("ready", roomId);
+      })
+      .catch(err => console.error("Camera Error:", err));
 
-		socket.on("call_accepted", (signal) => {
-			setCallAccepted(true);
-			peer.signal(signal);
-		});
+    socket.on("user_ready", (id) => setIdToCall(id));
 
-		connectionRef.current = peer;
-	};
+    socket.on("signal", (data) => {
+      if (connectionStatus.current === "connected") return;
 
-	const answerCall = () => {
-		setCallAccepted(true);
-		const peer = new Peer({
-			initiator: false,
-			trickle: false,
-			stream: stream
-		});
+      const senderId = data.from || data.callerID;
 
-		peer.on("signal", (data) => {
-			socket.emit("answer_call", { 
-                signal: data, 
-                roomId: roomId // Matches Server "data.roomId"
-            });
-		});
+      if (connectionRef.current && !callAccepted) {
+          setCallAccepted(true);
+          connectionStatus.current = "connected";
+          connectionRef.current.signal(data.signal);
+          return;
+      }
 
-		peer.on("stream", (stream) => {
-			userVideo.current.srcObject = stream;
-		});
+      if (!connectionRef.current && senderId !== socket.id) {
+          setReceivingCall(true);
+          setCaller(senderId);
+          setCallerSignal(data.signal);
+      }
+    });
 
-		peer.signal(callerSignal);
-		connectionRef.current = peer;
-	};
+    return () => {
+      socket.off("user_ready");
+      socket.off("signal");
+      if (connectionRef.current) connectionRef.current.destroy();
+    };
+  }, [roomId, socket]);
 
-	return (
-		<div className="video-call-container">
-            {/* MY VIDEO (Small, Bottom Corner) */}
-			{stream && (
-                <div className="my-video-frame">
-				    <video playsInline muted ref={myVideo} autoPlay />
+  // --- WATCHER 1: FORCE LOCAL VIDEO (Fixes the Black Box) ---
+  useEffect(() => {
+    if (myVideo.current && stream) {
+        myVideo.current.srcObject = stream;
+    }
+  }, [stream]); // Runs whenever the stream is ready
+
+  // --- WATCHER 2: FORCE PARTNER VIDEO ---
+  useEffect(() => {
+    if (partnerVideo.current && partnerStream) {
+        partnerVideo.current.srcObject = partnerStream;
+    }
+  }, [partnerStream, callAccepted]);
+
+
+  // --- CALL ACTIONS ---
+  const callUser = (id) => {
+    connectionStatus.current = "calling";
+    const peer = new Peer({ initiator: true, trickle: false, stream: stream });
+    
+    peer.on("signal", (data) => {
+      socket.emit("signal", { userToSignal: id, signal: data, from: socket.id });
+    });
+    
+    peer.on("stream", (currentStream) => setPartnerStream(currentStream));
+    
+    socket.on("signal", (data) => {
+        setCallAccepted(true);
+        if (connectionStatus.current !== "connected") {
+            connectionStatus.current = "connected";
+            peer.signal(data.signal);
+        }
+    });
+    connectionRef.current = peer;
+  };
+
+  const answerCall = () => {
+    setCallAccepted(true);
+    connectionStatus.current = "connected";
+    const peer = new Peer({ initiator: false, trickle: false, stream: stream });
+    
+    peer.on("signal", (data) => {
+      socket.emit("signal", { signal: data, userToSignal: caller, from: socket.id });
+    });
+    
+    peer.on("stream", (currentStream) => setPartnerStream(currentStream));
+    
+    peer.signal(callerSignal);
+    connectionRef.current = peer;
+  };
+
+  return (
+    <div 
+        ref={dragItem}
+        style={{ 
+            position: 'fixed', top: '20px', left: '20px', zIndex: 1000,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            background: 'rgba(0, 0, 0, 0.6)', padding: '10px',
+            borderRadius: '12px', backdropFilter: 'blur(5px)',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.5)', width: 'fit-content'
+        }}
+    >
+        {/* DRAG HANDLE */}
+        <div 
+            onMouseDown={handleMouseDown}
+            style={{ 
+                color: '#aaa', fontSize: '14px', marginBottom: '5px', 
+                cursor: 'grab', width: '100%', textAlign: 'center', userSelect: 'none'
+            }}
+        >
+           ::::
+        </div>
+
+        {/* BUTTONS */}
+        <div style={{ marginBottom: '8px', display: 'flex', gap: '5px' }}>
+            {idToCall && !callAccepted && !receivingCall && (
+                <button onClick={() => callUser(idToCall)} style={btnStyle('#28a745')}>Call Partner</button>
+            )}
+            {receivingCall && !callAccepted && (
+                <button onClick={answerCall} style={btnStyle('#007bff')}>Answer Call</button>
+            )}
+        </div>
+
+        {/* VIDEOS */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {stream && (
+                <div style={{ position: 'relative', width: '100px', height: '56px' }}>
+                    <video playsInline muted ref={myVideo} autoPlay style={videoStyle} />
                 </div>
-			)}
+            )}
             
-            {/* PARTNER VIDEO (Big, Overlay) */}
-			{callAccepted && !callEnded && (
-                <div className="partner-video-frame">
-				    <video playsInline ref={userVideo} autoPlay />
+            {callAccepted && (
+                <div style={{ position: 'relative', width: '240px', height: '135px' }}>
+                    <video playsInline ref={partnerVideo} autoPlay style={{ ...videoStyle, border: '2px solid #ff4757' }} />
                 </div>
-			)}
-
-            {/* CALL CONTROLS */}
-			<div className="call-controls">
-				{callAccepted && !callEnded ? (
-					<button onClick={() => setCallEnded(true)} className="end-call-btn">
-                        End Call
-                    </button>
-				) : (
-                    // IF receiving a call, show ANSWER. If not, show CALL.
-                    <div>
-                        {receivingCall && !callAccepted ? (
-                            <div className="incoming-call-alert">
-                                <p>Incoming Call...</p>
-                                <button onClick={answerCall} className="answer-btn">Answer</button>
-                            </div>
-                        ) : (
-                            <button onClick={callUser} className="call-btn">
-                                📹 Call Partner
-                            </button>
-                        )}
-                    </div>
-				)}
-			</div>
-		</div>
-	);
+            )}
+        </div>
+    </div>
+  );
 };
+
+const videoStyle = {
+    width: '100%', height: '100%', borderRadius: '8px',
+    background: '#000', objectFit: 'cover', aspectRatio: '16/9'
+};
+
+const btnStyle = (color) => ({
+    background: color, color: 'white', padding: '5px 10px',
+    borderRadius: '15px', border: 'none', cursor: 'pointer',
+    fontWeight: 'bold', fontSize: '12px'
+});
 
 export default VideoCall;
