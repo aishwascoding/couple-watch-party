@@ -4,13 +4,15 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
+// 1. Allow Express to handle CORS
 app.use(cors());
 
 const server = http.createServer(app);
 
+// 2. Allow Socket.io to handle CORS (The Critical Fix)
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Make sure this matches your React URL
+    origin: "*", // <--- THIS IS THE KEY. It allows your Vercel app to connect.
     methods: ["GET", "POST"],
   },
 });
@@ -18,13 +20,11 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
-  // 1. JOIN ROOM
   socket.on("join_room", (data) => {
     socket.join(data);
     console.log(`User with ID: ${socket.id} joined room: ${data}`);
   });
 
-  // 2. VIDEO SYNC EVENTS
   socket.on("play_video", (data) => {
     socket.to(data.room).emit("receive_play");
   });
@@ -41,7 +41,6 @@ io.on("connection", (socket) => {
     socket.to(data.room).emit("receive_file_change", data.fileData);
   });
 
-  // 3. VIDEO CALL SIGNALS (WebRTC)
   socket.on("call_user", (data) => {
     socket.to(data.roomId).emit("incoming_call", { 
         signal: data.signalData, 
@@ -53,10 +52,7 @@ io.on("connection", (socket) => {
     socket.to(data.roomId).emit("call_accepted", data.signal);
   });
 
-  // 4. REACTION EVENT (The Missing Piece!) 💖
   socket.on("send_reaction", (data) => {
-    // console.log("Reaction received:", data.emoji); // Uncomment to debug
-    // Broadcast to everyone in the room EXCEPT the sender
     socket.to(data.roomId).emit("receive_reaction", data.emoji);
   });
 
@@ -66,5 +62,5 @@ io.on("connection", (socket) => {
 });
 
 server.listen(3001, () => {
-  console.log("SERVER RUNNING ON PORT 3001");
+  console.log("SERVER RUNNING");
 });
