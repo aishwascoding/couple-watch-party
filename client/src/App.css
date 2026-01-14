@@ -1,0 +1,286 @@
+/* IMPORT 8-BIT FONT */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  --bg-color: #3e2723; /* Dark Brown */
+  --primary-brown: #5d4037; /* Coffee Bean */
+  --accent-beige: #d7ccc8; /* Latte Foam */
+  --highlight-gold: #ffecb3; /* Warm Light */
+  --text-color: #efebe9; /* Off-white */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  font-family: 'Press Start 2P', cursive;
+  overflow: hidden;
+  height: 100vh;
+  color: var(--text-color);
+  
+  /* lobby background */
+  background: url('https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaGp2aWR0c2w5cXV1ZGg1NW55N2xiOWc5M3dxY3RtOXBvdDJieWRxeCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/j3OL6mSc2FeV0UHMDg/giphy.gif') no-repeat center center fixed;
+  background-size: cover;
+  image-rendering: pixelated;
+}
+
+/* overlay (warm) */
+body::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(62, 39, 35, 0.75); /* Sepia/Brown Tint */
+  z-index: -1;
+}
+
+.App {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+/* --- THE LOBBY BOX --- */
+.lobby {
+  background: #281815; 
+  padding: 40px;
+  width: 450px;
+  text-align: center;
+  position: relative;
+  
+  /* BEIGE PIXEL BORDER */
+  box-shadow:
+    -6px 0 0 0 var(--accent-beige),
+    6px 0 0 0 var(--accent-beige),
+    0 -6px 0 0 var(--accent-beige),
+    0 6px 0 0 var(--accent-beige),
+    -6px -6px 0 0 var(--accent-beige),
+    6px -6px 0 0 var(--accent-beige),
+    -6px 6px 0 0 var(--accent-beige),
+    6px 6px 0 0 var(--accent-beige),
+    0 0 0 6px #5d4037; 
+    
+  image-rendering: pixelated;
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
+}
+
+/* heart */
+.pixel-heart {
+  color: var(--highlight-gold);
+  font-size: 30px;
+  text-shadow: 2px 2px #5d4037;
+  margin-bottom: 20px;
+  display: block;
+  animation: beat 1.5s infinite ease-in-out;
+}
+
+@keyframes beat {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+.lobby h1 {
+  font-size: 1.5rem;
+  line-height: 1.5;
+  color: var(--accent-beige);
+  text-shadow: 3px 3px #000;
+  margin-bottom: 30px;
+  text-transform: uppercase;
+}
+
+.lobby .subtitle {
+  font-size: 0.6rem;
+  color: #a1887f; 
+  margin-bottom: 40px;
+  letter-spacing: 1px;
+}
+
+/* --- INPUT FIELD --- */
+.input-group {
+  margin-bottom: 25px;
+}
+
+.lobby input {
+  width: 100%;
+  padding: 15px 0;
+  background: #281815;
+  border: none;
+  border-bottom: 4px solid #5d4037;
+  color: var(--highlight-gold);
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.8rem;
+  text-align: center;
+  outline: none;
+}
+
+.lobby input:focus {
+  border-bottom: 4px solid var(--accent-beige);
+}
+
+.lobby input::placeholder {
+  color: #6d4c41;
+}
+
+/* button*/
+.lobby button {
+  background: var(--primary-brown);
+  color: var(--accent-beige);
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.8rem;
+  padding: 20px 20px;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  position: relative;
+  /* 3D Pixel Effect */
+  box-shadow: inset -4px -4px 0px 0px rgba(0,0,0,0.3); 
+  transition: 0.1s;
+}
+
+.lobby button:hover {
+  background: #6d4c41; /* Lighter Brown */
+  color: white;
+  transform: translateY(2px);
+}
+
+.lobby button:active {
+  transform: translateY(4px);
+  box-shadow: inset 4px 4px 0px 0px rgba(0,0,0,0.3);
+}
+
+/* fullscreen */
+
+.theater-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* FULLSCREEN BACKGROUND */
+.theater-container:fullscreen {
+  background: url('https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3a295c25wcWV0Y2s5MThqbTRzOHlnaXBpN2Yxbmg4eTdoMHJkczc0ciZlcD12MV9naWZzX3JlbGF0ZWQmY3Q9Zw/8SzmrGqs6oD7i/giphy.gif') no-repeat center center fixed;
+  background-size: cover;
+  image-rendering: pixelated;
+  justify-content: center;
+}
+
+/* border*/
+.tv-frame-container {
+  /* THE BEIGE BORDER (Thin & Elegant) */
+  background: #d7ccc8; 
+  padding: 8px;
+  border-radius: 20px;
+  
+  box-shadow: 
+    0 0 0 6px rgba(93, 64, 55, 0.15),
+    0 25px 50px rgba(0,0,0,0.6);
+
+  transition: all 0.5s ease;
+
+  /* Normal Mode Size */
+  width: 100%;
+  max-width: 650px; 
+  margin: 0 auto;   
+}
+
+/* video fix */
+.tv-screen-inset {
+    border-radius: 15px;
+    overflow: hidden;
+    background: #000;
+}
+
+.tv-screen-inset video {
+  display: block;
+  width: 100%;
+  height: auto;
+  
+  /*video ratio*/
+  max-height: 50vh; 
+  object-fit: contain; 
+}
+
+
+/*full screen adjustment*/
+.theater-container:fullscreen .tv-frame-container {
+   /* 1. Grow wider */
+   width: 90vw; 
+   /* 2. Cap width at 1300px (Cinematic size) */
+   max-width: 1300px; 
+}
+
+.theater-container:fullscreen .tv-screen-inset video {
+   /* hieght cap*/
+   max-height: 85vh; 
+}
+
+
+/* new row */
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  
+  /* match width */
+  max-width: 650px; 
+  margin-top: 15px;
+}
+
+/* Update row width when in fullscreen */
+.theater-container:fullscreen .controls-row {
+    width: 90vw;
+    max-width: 1300px;
+}
+
+/* BUTTON STYLE */
+.theater-btn {
+  background: #efebe9;
+  border: none;
+  color: #5d4037;
+  padding: 12px 20px;
+  border-radius: 50px;
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.7rem;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  transition: 0.2s;
+  white-space: nowrap; /* Keeps text on one line */
+}
+
+.theater-btn:hover {
+  background: #fff;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(255, 255, 255, 0.4);
+}
+
+/* aish */
+.dev-credit {
+  /* bottom lock */
+  position: fixed; 
+  bottom: 15px;
+  left: 0;
+  
+  /* width */
+  width: 100%;
+  text-align: center;
+  
+  /* style*/
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.5rem; /* Very small and clean */
+  color: rgba(255, 255, 255, 0.5); /* 50% fade so it's not distracting */
+  
+  z-index: 10; /* Ensure it sits on top of any background images */
+  pointer-events: none; /* Let clicks pass through it */
+}
